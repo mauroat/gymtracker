@@ -1,233 +1,102 @@
 <template>
   <div class="page fade-in">
-    <div class="page-header">
-      <h2>Estadísticas</h2>
-      <p class="text-muted text-sm">Progresión de pesos, volumen y PRs</p>
-    </div>
+    <div class="page-header"><h2 class="title-1">Estadísticas</h2></div>
 
     <!-- PRs -->
-    <div class="section-title">🏆 Records personales</div>
-    <div v-if="prs.length === 0" class="empty-state" style="padding:24px">
-      <div>Aún no hay datos suficientes</div>
-    </div>
-    <div v-else class="prs-grid">
+    <div class="section-header">Records personales</div>
+    <div v-if="prs.length === 0" class="empty-state" style="padding:24px 0"><div class="icon">🏆</div><div>Sin datos aún</div></div>
+    <div v-else class="pr-grid">
       <div v-for="pr in prs" :key="pr.exercise_id" class="pr-card">
-        <div class="pr-exercise">{{ pr.exercise_name }}</div>
-        <div class="pr-routine text-xs text-muted">{{ pr.routine_name }}</div>
         <div class="pr-weight">{{ pr.pr_weight }}<span class="pr-unit">kg</span></div>
-        <div class="text-xs text-muted" v-if="pr.achieved_at">{{ formatDate(pr.achieved_at) }}</div>
+        <div class="pr-name truncate">{{ pr.exercise_name }}</div>
+        <div class="caption truncate">{{ pr.routine_name }}</div>
       </div>
     </div>
 
-    <!-- Weekly volume chart -->
-    <div class="section-title" style="margin-top:32px">📊 Volumen semanal (kg·reps)</div>
+    <!-- Weekly volume -->
+    <div class="section-header" style="margin-top:8px">Volumen semanal</div>
     <div class="chart-card">
-      <canvas ref="volumeCanvas" height="220"></canvas>
+      <canvas ref="volCanvas" height="180"></canvas>
     </div>
 
     <!-- Exercise progress -->
-    <div class="section-title" style="margin-top:32px">📈 Progresión por ejercicio</div>
-    <div class="exercise-selector">
-      <select v-model="selectedExerciseId" @change="loadExerciseChart">
+    <div class="section-header" style="margin-top:8px">Progresión</div>
+    <div class="field-group" style="margin-bottom:12px">
+      <select v-model="selExId" @change="loadExChart">
         <option value="">— Seleccioná un ejercicio —</option>
         <optgroup v-for="r in routines" :key="r.id" :label="r.name">
           <option v-for="ex in r.exercises" :key="ex.id" :value="ex.id">{{ ex.name }}</option>
         </optgroup>
       </select>
     </div>
-    <div class="chart-card" v-if="selectedExerciseId">
-      <div v-if="exerciseData.length === 0" class="empty-state" style="padding:24px">
-        <div>Sin datos para este ejercicio aún</div>
-      </div>
-      <canvas v-else ref="progressCanvas" height="220"></canvas>
+    <div v-if="selExId" class="chart-card">
+      <div v-if="exData.length === 0" class="empty-state" style="padding:24px"><div>Sin datos para este ejercicio</div></div>
+      <canvas v-else ref="progCanvas" height="180"></canvas>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick, watch } from 'vue'
+import { ref, onMounted, nextTick } from 'vue'
 import { api } from '../composables/api'
-import {
-  Chart,
-  LineController, BarController,
-  CategoryScale, LinearScale,
-  PointElement, LineElement, BarElement,
-  Tooltip, Legend, Filler
-} from 'chart.js'
+import { Chart, LineController, BarController, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend, Filler } from 'chart.js'
+Chart.register(LineController, BarController, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend, Filler)
 
-Chart.register(LineController, BarController, CategoryScale, LinearScale,
-  PointElement, LineElement, BarElement, Tooltip, Legend, Filler)
+const prs = ref([]); const routines = ref([]); const weeklyData = ref([])
+const exData = ref([]); const selExId = ref(''); const volCanvas = ref(null); const progCanvas = ref(null)
+let volChart = null; let progChart = null
 
-const prs = ref([])
-const routines = ref([])
-const weeklyData = ref([])
-const exerciseData = ref([])
-const selectedExerciseId = ref('')
-const volumeCanvas = ref(null)
-const progressCanvas = ref(null)
-let volumeChart = null
-let progressChart = null
+const isDark = () => document.documentElement.getAttribute('data-theme') === 'dark'
+const gridColor = () => isDark() ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'
+const tickColor = () => isDark() ? '#8e8e93' : '#8e8e93'
+const tooltipOpts = () => ({ backgroundColor: isDark()?'#1c1c1e':'#ffffff', borderColor: isDark()?'#3a3a3c':'#e5e5ea', borderWidth:1, titleColor: isDark()?'#fff':'#1c1c1e', bodyColor: '#8e8e93', padding:10, cornerRadius:8 })
 
-const formatDate = (d) => {
-  if (!d) return ''
-  return new Date(d + (d.includes('Z') ? '' : 'Z')).toLocaleDateString('es-AR', {
-    day: 'numeric', month: 'short', year: '2-digit'
+const fmtDate = d => d ? new Date(d+(d.includes('Z')?'':'Z')).toLocaleDateString('es-AR',{day:'numeric',month:'short'}) : ''
+
+const buildVolChart = () => {
+  if (!volCanvas.value || !weeklyData.value.length) return
+  if (volChart) volChart.destroy()
+  volChart = new Chart(volCanvas.value, {
+    type:'bar',
+    data:{ labels: weeklyData.value.map(w=>w.week), datasets:[{ label:'Volumen', data: weeklyData.value.map(w=>Math.round(w.total_volume||0)), backgroundColor: 'rgba(0,122,255,0.2)', borderColor:'#007aff', borderWidth:1, borderRadius:4 }] },
+    options:{ responsive:true, plugins:{ legend:{display:false}, tooltip: tooltipOpts() }, scales:{ x:{ticks:{color:tickColor(),font:{size:11}},grid:{color:gridColor()}}, y:{ticks:{color:tickColor(),font:{size:11}},grid:{color:gridColor()}} } }
   })
 }
 
-const chartDefaults = {
-  color: '#a0a0a0',
-  borderColor: '#2a2a2a',
+const loadExChart = async () => {
+  if (!selExId.value) return
+  exData.value = await api.getExerciseProgress(selExId.value)
+  await nextTick(); buildProgChart()
 }
 
-const buildVolumeChart = () => {
-  if (!volumeCanvas.value || weeklyData.value.length === 0) return
-  if (volumeChart) volumeChart.destroy()
-
-  const labels = weeklyData.value.map(w => w.week)
-  const volumes = weeklyData.value.map(w => Math.round(w.total_volume || 0))
-
-  volumeChart = new Chart(volumeCanvas.value, {
-    type: 'bar',
-    data: {
-      labels,
-      datasets: [{
-        label: 'Volumen total (kg×reps)',
-        data: volumes,
-        backgroundColor: 'rgba(232,244,34,0.25)',
-        borderColor: '#e8f422',
-        borderWidth: 1,
-        borderRadius: 4,
-      }]
-    },
-    options: {
-      responsive: true,
-      plugins: {
-        legend: { labels: { color: '#a0a0a0', font: { family: 'DM Sans' } } },
-        tooltip: {
-          backgroundColor: '#1c1c1c', borderColor: '#363636', borderWidth: 1,
-          titleColor: '#f0f0f0', bodyColor: '#a0a0a0',
-        }
-      },
-      scales: {
-        x: { ticks: { color: '#606060' }, grid: { color: '#1c1c1c' } },
-        y: { ticks: { color: '#606060' }, grid: { color: '#1c1c1c' } }
-      }
-    }
-  })
-}
-
-const loadExerciseChart = async () => {
-  if (!selectedExerciseId.value) return
-  exerciseData.value = await api.getExerciseProgress(selectedExerciseId.value)
-  await nextTick()
-  buildProgressChart()
-}
-
-const buildProgressChart = () => {
-  if (!progressCanvas.value || exerciseData.value.length === 0) return
-  if (progressChart) progressChart.destroy()
-
-  const labels = exerciseData.value.map(d => formatDate(d.session_date))
-  const weights = exerciseData.value.map(d => d.max_weight)
-  const volumes = exerciseData.value.map(d => Math.round(d.total_volume || 0))
-
-  progressChart = new Chart(progressCanvas.value, {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [
-        {
-          label: 'Peso máximo (kg)',
-          data: weights,
-          borderColor: '#e8f422',
-          backgroundColor: 'rgba(232,244,34,0.08)',
-          pointBackgroundColor: '#e8f422',
-          pointRadius: 4,
-          tension: 0.3,
-          fill: true,
-          yAxisID: 'y',
-        },
-        {
-          label: 'Volumen total',
-          data: volumes,
-          borderColor: '#4ade80',
-          backgroundColor: 'rgba(74,222,128,0.06)',
-          pointBackgroundColor: '#4ade80',
-          pointRadius: 3,
-          tension: 0.3,
-          fill: false,
-          yAxisID: 'y2',
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      interaction: { mode: 'index', intersect: false },
-      plugins: {
-        legend: { labels: { color: '#a0a0a0', font: { family: 'DM Sans' } } },
-        tooltip: {
-          backgroundColor: '#1c1c1c', borderColor: '#363636', borderWidth: 1,
-          titleColor: '#f0f0f0', bodyColor: '#a0a0a0',
-        }
-      },
-      scales: {
-        x: { ticks: { color: '#606060' }, grid: { color: '#1c1c1c' } },
-        y: {
-          ticks: { color: '#e8f422' }, grid: { color: '#1c1c1c' },
-          title: { display: true, text: 'kg', color: '#e8f422' }
-        },
-        y2: {
-          position: 'right', ticks: { color: '#4ade80' }, grid: { drawOnChartArea: false },
-          title: { display: true, text: 'Volumen', color: '#4ade80' }
-        }
-      }
-    }
+const buildProgChart = () => {
+  if (!progCanvas.value || !exData.value.length) return
+  if (progChart) progChart.destroy()
+  progChart = new Chart(progCanvas.value, {
+    type:'line',
+    data:{ labels: exData.value.map(d=>fmtDate(d.session_date)),
+      datasets:[
+        { label:'Peso máx (kg)', data: exData.value.map(d=>d.max_weight), borderColor:'#007aff', backgroundColor:'rgba(0,122,255,0.08)', pointBackgroundColor:'#007aff', pointRadius:4, tension:0.3, fill:true, yAxisID:'y' },
+        { label:'Volumen', data: exData.value.map(d=>Math.round(d.total_volume||0)), borderColor:'#34c759', backgroundColor:'transparent', pointBackgroundColor:'#34c759', pointRadius:3, tension:0.3, fill:false, yAxisID:'y2' }
+      ] },
+    options:{ responsive:true, interaction:{mode:'index',intersect:false}, plugins:{ legend:{labels:{color:tickColor(),font:{size:11}}}, tooltip:tooltipOpts() },
+      scales:{ x:{ticks:{color:tickColor(),font:{size:11}},grid:{color:gridColor()}}, y:{ticks:{color:'#007aff',font:{size:11}},grid:{color:gridColor()},title:{display:true,text:'kg',color:'#007aff',font:{size:10}}}, y2:{position:'right',ticks:{color:'#34c759',font:{size:11}},grid:{drawOnChartArea:false},title:{display:true,text:'Vol',color:'#34c759',font:{size:10}}} } }
   })
 }
 
 onMounted(async () => {
-  const [p, r, w] = await Promise.all([
-    api.getPRs(),
-    api.getRoutines(),
-    api.getWeeklyVolume()
-  ])
-  prs.value = p
-  weeklyData.value = w
-
-  // Load routines with exercises for selector
-  const detailed = await Promise.all(r.map(rt => api.getRoutine(rt.id)))
-  routines.value = detailed
-
-  await nextTick()
-  buildVolumeChart()
+  const [p, r, w] = await Promise.all([api.getPRs(), api.getRoutines(), api.getWeeklyVolume()])
+  prs.value = p; weeklyData.value = w
+  routines.value = await Promise.all(r.map(rt => api.getRoutine(rt.id)))
+  await nextTick(); buildVolChart()
 })
 </script>
 
 <style scoped>
-.section-title {
-  font-family: var(--font-display); font-size: 1rem; letter-spacing: 0.08em;
-  color: var(--text2); text-transform: uppercase; margin-bottom: 12px;
-}
-
-.prs-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px;
-}
-.pr-card {
-  background: var(--bg2); border: 1px solid var(--border);
-  border-radius: var(--radius2); padding: 14px;
-}
-.pr-exercise { font-size: 13px; font-weight: 500; margin-bottom: 2px; }
-.pr-routine { margin-bottom: 8px; }
-.pr-weight {
-  font-family: var(--font-display); font-size: 2rem; color: var(--accent); line-height: 1;
-}
-.pr-unit { font-size: 1rem; margin-left: 2px; color: var(--text2); }
-
-.chart-card {
-  background: var(--bg2); border: 1px solid var(--border);
-  border-radius: var(--radius2); padding: 20px;
-}
-
-.exercise-selector { margin-bottom: 12px; max-width: 380px; }
+.pr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin-bottom: 4px; }
+.pr-card { background: var(--bg2); border-radius: var(--radius-lg); padding: 14px 12px; box-shadow: var(--shadow-sm); }
+.pr-weight { font-size: 1.75rem; font-weight: 700; letter-spacing: -0.03em; color: var(--accent); line-height: 1; margin-bottom: 4px; }
+.pr-unit { font-size: 1rem; font-weight: 500; color: var(--text3); margin-left: 2px; }
+.pr-name { font-size: 0.8125rem; font-weight: 600; margin-bottom: 2px; }
+.chart-card { background: var(--bg2); border-radius: var(--radius-lg); padding: 16px; box-shadow: var(--shadow-sm); }
 </style>

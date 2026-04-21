@@ -115,7 +115,7 @@
 import { ref, computed, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '../composables/api'
-import { SUGGESTED_ROUTINES, CATEGORIES } from '../data/suggestedRoutines'
+import { SUGGESTED_ROUTINES, CATEGORIES } from '../suggestedRoutines'
 
 const router = useRouter()
 const routines = ref([])

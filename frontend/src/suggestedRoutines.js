@@ -1,0 +1,82 @@
+export const SUGGESTED_ROUTINES = [
+  { id:'ppl-push', category:'PPL', color:'#007aff', icon:'💪', name:'Push — Empuje', day_label:'PPL · Push', description:'Pecho, hombros y tríceps con énfasis en hipertrofia', exercises:[
+    { name:'Press banca con barra', rest:180, notes:'Movimiento principal', sets:[{w:null,r:5},{w:null,r:5},{w:null,r:5},{w:null,r:5},{w:null,r:5}] },
+    { name:'Press inclinado con mancuernas', rest:90, notes:'', sets:[{w:null,r:10},{w:null,r:10},{w:null,r:10}] },
+    { name:'Press militar con barra', rest:90, notes:'', sets:[{w:null,r:8},{w:null,r:8},{w:null,r:8}] },
+    { name:'Aperturas en cable', rest:60, notes:'', sets:[{w:null,r:12},{w:null,r:12},{w:null,r:15}] },
+    { name:'Elevaciones laterales con mancuernas', rest:60, notes:'', sets:[{w:null,r:15},{w:null,r:15},{w:null,r:15}] },
+    { name:'Extensión de tríceps en polea', rest:60, notes:'', sets:[{w:null,r:12},{w:null,r:12},{w:null,r:12}] },
+    { name:'Press francés con barra', rest:60, notes:'', sets:[{w:null,r:10},{w:null,r:10},{w:null,r:10}] },
+  ]},
+  { id:'ppl-pull', category:'PPL', color:'#007aff', icon:'🔙', name:'Pull — Tracción', day_label:'PPL · Pull', description:'Espalda y bíceps, énfasis en grosor y longitud', exercises:[
+    { name:'Dominadas lastre', rest:180, notes:'Agarre prono', sets:[{w:null,r:6},{w:null,r:6},{w:null,r:6},{w:null,r:6}] },
+    { name:'Remo con barra pronado', rest:120, notes:'Retracción escapular', sets:[{w:null,r:8},{w:null,r:8},{w:null,r:8}] },
+    { name:'Remo en polea baja', rest:90, notes:'', sets:[{w:null,r:10},{w:null,r:10},{w:null,r:10}] },
+    { name:'Pullover en polea alta', rest:60, notes:'', sets:[{w:null,r:12},{w:null,r:12},{w:null,r:12}] },
+    { name:'Face pull en polea', rest:60, notes:'Protección del manguito', sets:[{w:null,r:15},{w:null,r:15},{w:null,r:15}] },
+    { name:'Curl con barra recta', rest:75, notes:'', sets:[{w:null,r:10},{w:null,r:10},{w:null,r:10}] },
+    { name:'Curl martillo con mancuernas', rest:60, notes:'', sets:[{w:null,r:12},{w:null,r:12},{w:null,r:12}] },
+  ]},
+  { id:'ppl-legs', category:'PPL', color:'#007aff', icon:'🦵', name:'Legs — Piernas', day_label:'PPL · Legs', description:'Cuádriceps, femoral y glúteos equilibrados', exercises:[
+    { name:'Sentadilla con barra', rest:240, notes:'RPE 8', sets:[{w:null,r:5},{w:null,r:5},{w:null,r:5},{w:null,r:5},{w:null,r:5}] },
+    { name:'Peso muerto rumano', rest:180, notes:'Control excéntrico 3s', sets:[{w:null,r:6},{w:null,r:6},{w:null,r:6},{w:null,r:6}] },
+    { name:'Prensa 45°', rest:120, notes:'', sets:[{w:null,r:10},{w:null,r:10},{w:null,r:10}] },
+    { name:'Extensión de cuádriceps en máquina', rest:60, notes:'', sets:[{w:null,r:12},{w:null,r:12},{w:null,r:12}] },
+    { name:'Curl femoral tumbado', rest:75, notes:'', sets:[{w:null,r:12},{w:null,r:12},{w:null,r:12}] },
+    { name:'Elevación de gemelos de pie', rest:60, notes:'Pausa 1s arriba', sets:[{w:null,r:15},{w:null,r:15},{w:null,r:15},{w:null,r:15}] },
+  ]},
+  { id:'strength-a', category:'5×5 Fuerza', color:'#ff9500', icon:'🔥', name:'Fuerza A', day_label:'Fuerza · A', description:'Sentadilla · Press banca · Remo. Progresión lineal.', exercises:[
+    { name:'Sentadilla con barra', rest:300, notes:'Incremento 2.5kg/sesión', sets:[{w:null,r:5},{w:null,r:5},{w:null,r:5},{w:null,r:5},{w:null,r:5}] },
+    { name:'Press banca con barra', rest:240, notes:'Incremento 2.5kg/sesión', sets:[{w:null,r:5},{w:null,r:5},{w:null,r:5},{w:null,r:5},{w:null,r:5}] },
+    { name:'Remo con barra supinado', rest:240, notes:'Incremento 2.5kg/sesión', sets:[{w:null,r:5},{w:null,r:5},{w:null,r:5},{w:null,r:5},{w:null,r:5}] },
+  ]},
+  { id:'strength-b', category:'5×5 Fuerza', color:'#ff9500', icon:'⚡', name:'Fuerza B', day_label:'Fuerza · B', description:'Sentadilla · Press militar · Peso muerto.', exercises:[
+    { name:'Sentadilla con barra', rest:300, notes:'Incremento 2.5kg/sesión', sets:[{w:null,r:5},{w:null,r:5},{w:null,r:5},{w:null,r:5},{w:null,r:5}] },
+    { name:'Press militar con barra', rest:240, notes:'Incremento 1.25kg/sesión', sets:[{w:null,r:5},{w:null,r:5},{w:null,r:5},{w:null,r:5},{w:null,r:5}] },
+    { name:'Peso muerto convencional', rest:300, notes:'1×5, incremento 5kg/sesión', sets:[{w:null,r:5}] },
+  ]},
+  { id:'hyp-upper', category:'Hipertrofia', color:'#af52de', icon:'🎯', name:'Upper — Tren superior', day_label:'Hiper · Upper', description:'Volumen alto con técnicas de intensidad para músculo', exercises:[
+    { name:'Press banca con barra', rest:120, notes:'Pesado', sets:[{w:null,r:6},{w:null,r:6},{w:null,r:6},{w:null,r:8}] },
+    { name:'Press inclinado con mancuernas', rest:90, notes:'', sets:[{w:null,r:10},{w:null,r:10},{w:null,r:12}] },
+    { name:'Dominadas lastradas', rest:120, notes:'', sets:[{w:null,r:6},{w:null,r:6},{w:null,r:8}] },
+    { name:'Remo en polea con agarre neutro', rest:90, notes:'', sets:[{w:null,r:10},{w:null,r:10},{w:null,r:12}] },
+    { name:'Press militar mancuernas', rest:90, notes:'', sets:[{w:null,r:10},{w:null,r:10},{w:null,r:12}] },
+    { name:'Elevaciones laterales en cable', rest:60, notes:'Serie descendente', sets:[{w:null,r:12},{w:null,r:12},{w:null,r:15}] },
+    { name:'Fondos en paralelas', rest:75, notes:'', sets:[{w:null,r:10},{w:null,r:10},{w:null,r:10}] },
+    { name:'Curl en cable unilateral', rest:60, notes:'', sets:[{w:null,r:12},{w:null,r:12},{w:null,r:15}] },
+  ]},
+  { id:'hyp-lower', category:'Hipertrofia', color:'#af52de', icon:'🏆', name:'Lower — Tren inferior', day_label:'Hiper · Lower', description:'Volumen alto para cuádriceps, femoral y glúteos', exercises:[
+    { name:'Sentadilla frontal', rest:180, notes:'Énfasis cuádriceps', sets:[{w:null,r:6},{w:null,r:6},{w:null,r:8},{w:null,r:8}] },
+    { name:'Peso muerto rumano con mancuernas', rest:120, notes:'', sets:[{w:null,r:10},{w:null,r:10},{w:null,r:12}] },
+    { name:'Hack squat en máquina', rest:120, notes:'', sets:[{w:null,r:10},{w:null,r:10},{w:null,r:10}] },
+    { name:'Zancada búlgara con mancuernas', rest:90, notes:'', sets:[{w:null,r:10},{w:null,r:10},{w:null,r:10}] },
+    { name:'Curl femoral sentado', rest:75, notes:'Rango completo', sets:[{w:null,r:12},{w:null,r:12},{w:null,r:12}] },
+    { name:'Abducción de cadera en máquina', rest:60, notes:'', sets:[{w:null,r:15},{w:null,r:15},{w:null,r:15}] },
+    { name:'Gemelos en prensa', rest:60, notes:'', sets:[{w:null,r:15},{w:null,r:15},{w:null,r:15},{w:null,r:20}] },
+  ]},
+  { id:'fb-a', category:'Full Body', color:'#34c759', icon:'🌐', name:'Full Body A', day_label:'FB · Día A', description:'Cuerpo completo con movimientos compuestos', exercises:[
+    { name:'Sentadilla con barra', rest:180, notes:'', sets:[{w:null,r:5},{w:null,r:5},{w:null,r:5}] },
+    { name:'Press banca con barra', rest:180, notes:'', sets:[{w:null,r:5},{w:null,r:5},{w:null,r:5}] },
+    { name:'Remo con mancuerna', rest:90, notes:'', sets:[{w:null,r:8},{w:null,r:8},{w:null,r:8}] },
+    { name:'Press militar con barra', rest:120, notes:'', sets:[{w:null,r:8},{w:null,r:8},{w:null,r:8}] },
+    { name:'Curl con barra', rest:60, notes:'', sets:[{w:null,r:10},{w:null,r:10},{w:null,r:10}] },
+    { name:'Extensión de tríceps', rest:60, notes:'', sets:[{w:null,r:10},{w:null,r:10},{w:null,r:10}] },
+  ]},
+  { id:'fb-b', category:'Full Body', color:'#34c759', icon:'🔄', name:'Full Body B', day_label:'FB · Día B', description:'Variante con peso muerto y press inclinado', exercises:[
+    { name:'Peso muerto convencional', rest:240, notes:'', sets:[{w:null,r:5},{w:null,r:5},{w:null,r:5}] },
+    { name:'Press inclinado con mancuernas', rest:120, notes:'', sets:[{w:null,r:8},{w:null,r:8},{w:null,r:8}] },
+    { name:'Dominadas', rest:120, notes:'', sets:[{w:null,r:6},{w:null,r:6},{w:null,r:6}] },
+    { name:'Zancadas con mancuernas', rest:90, notes:'', sets:[{w:null,r:10},{w:null,r:10},{w:null,r:10}] },
+    { name:'Elevaciones laterales', rest:60, notes:'', sets:[{w:null,r:12},{w:null,r:12},{w:null,r:12}] },
+  ]},
+  { id:'cardio-hiit', category:'Cardio', color:'#ff3b30', icon:'🏃', name:'HIIT Cardio', day_label:'Cardio · HIIT', description:'Intervalos de alta intensidad, 35-40 min totales', exercises:[
+    { name:'Calentamiento: caminata en inclinación', rest:0, notes:'5 min al 5%', sets:[{w:null,r:1}] },
+    { name:'Sprint 40s/20s pausa', rest:20, notes:'10 rondas', sets:[{w:null,r:1},{w:null,r:1},{w:null,r:1},{w:null,r:1},{w:null,r:1},{w:null,r:1},{w:null,r:1},{w:null,r:1},{w:null,r:1},{w:null,r:1}] },
+    { name:'Vuelta a la calma', rest:0, notes:'5 min caminata', sets:[{w:null,r:1}] },
+  ]},
+  { id:'cardio-liss', category:'Cardio', color:'#ff3b30', icon:'🚴', name:'LISS Recuperación', day_label:'Cardio · LISS', description:'Cardio de baja intensidad para recuperación activa', exercises:[
+    { name:'Bicicleta estática suave', rest:0, notes:'45 min a ritmo conversacional', sets:[{w:null,r:1}] },
+  ]},
+]
+
+export const CATEGORIES = [...new Set(SUGGESTED_ROUTINES.map(r => r.category))]

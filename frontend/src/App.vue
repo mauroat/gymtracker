@@ -1,38 +1,48 @@
 <template>
-  <div class="app-layout" :class="{ 'no-sidebar': isLoginPage }">
-    <nav v-if="!isLoginPage" class="sidebar">
+  <div class="app-layout">
+    <!-- Sidebar: desktop only -->
+    <nav v-if="!isAuthPage" class="sidebar">
       <div class="sidebar-logo">
-        <span class="logo-text">GYM</span>
-        <span class="logo-accent">TRACKER</span>
+        <span class="logo-mark">💪</span>
+        <span class="logo-name">GymTracker</span>
       </div>
       <div class="sidebar-nav">
-        <RouterLink to="/" class="nav-item" :class="{ active: $route.path === '/' }">
-          <span class="nav-icon">⚡</span><span>Dashboard</span>
-        </RouterLink>
-        <RouterLink to="/routines" class="nav-item" :class="{ active: $route.path.startsWith('/routine') }">
-          <span class="nav-icon">📋</span><span>Rutinas</span>
-        </RouterLink>
-        <RouterLink to="/history" class="nav-item" :class="{ active: $route.path === '/history' }">
-          <span class="nav-icon">📅</span><span>Historial</span>
-        </RouterLink>
-        <RouterLink to="/stats" class="nav-item" :class="{ active: $route.path === '/stats' }">
-          <span class="nav-icon">📈</span><span>Estadísticas</span>
+        <RouterLink v-for="tab in tabs" :key="tab.to" :to="tab.to"
+          class="sidebar-item" :class="{ active: isActive(tab.to) }">
+          <span class="sidebar-icon">{{ tab.icon }}</span>
+          <span>{{ tab.label }}</span>
         </RouterLink>
       </div>
       <div class="sidebar-footer">
-        <div class="user-chip">
-          <div class="user-avatar">{{ avatarLetter }}</div>
-          <div class="user-info">
-            <div class="user-name">{{ auth.user?.display_name || auth.user?.username }}</div>
-            <div class="user-username text-xs text-muted">@{{ auth.user?.username }}</div>
+        <div class="sidebar-user">
+          <div class="avatar">{{ avatarLetter }}</div>
+          <div class="user-text">
+            <div class="user-name truncate">{{ auth.user?.display_name || auth.user?.username }}</div>
+            <div class="user-handle truncate">@{{ auth.user?.username }}</div>
           </div>
         </div>
-        <button class="btn btn-ghost btn-sm" @click="logout" title="Cerrar sesión">⏏</button>
+        <div class="sidebar-actions">
+          <button class="icon-btn" @click="themeStore.toggle()" :title="themeStore.theme === 'dark' ? 'Modo día' : 'Modo noche'">
+            {{ themeStore.theme === 'dark' ? '☀️' : '🌙' }}
+          </button>
+          <button class="icon-btn" @click="logout" title="Cerrar sesión">⏏</button>
+        </div>
       </div>
     </nav>
+
+    <!-- Main content -->
     <main class="main-content">
       <RouterView />
     </main>
+
+    <!-- Bottom tab bar: mobile only -->
+    <nav v-if="!isAuthPage" class="tab-bar">
+      <RouterLink v-for="tab in tabs" :key="tab.to" :to="tab.to"
+        class="tab-item" :class="{ active: isActive(tab.to) }">
+        <span class="tab-icon">{{ tab.icon }}</span>
+        <span class="tab-label">{{ tab.label }}</span>
+      </RouterLink>
+    </nav>
   </div>
 </template>
 
@@ -40,82 +50,80 @@
 import { computed } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from './stores/auth'
+import { useThemeStore } from './stores/theme'
 
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
+const themeStore = useThemeStore()
 
-const isLoginPage = computed(() => route.path === '/login')
-const avatarLetter = computed(() => {
-  const name = auth.user?.display_name || auth.user?.username || '?'
-  return name[0].toUpperCase()
-})
+const isAuthPage = computed(() => route.path === '/login')
+const avatarLetter = computed(() => (auth.user?.display_name || auth.user?.username || '?')[0].toUpperCase())
 
-const logout = () => {
-  auth.logout()
-  router.push('/login')
-}
+const tabs = [
+  { to: '/',         icon: '⚡', label: 'Inicio'   },
+  { to: '/routines', icon: '📋', label: 'Rutinas'  },
+  { to: '/history',  icon: '📅', label: 'Historial'},
+  { to: '/stats',    icon: '📈', label: 'Stats'    },
+]
+
+const isActive = (to) => to === '/' ? route.path === '/' : route.path.startsWith(to)
+const logout = () => { auth.logout(); router.push('/login') }
 </script>
 
 <style scoped>
-.app-layout { display: flex; min-height: 100vh; }
-.app-layout.no-sidebar { display: block; }
+.app-layout { display: flex; min-height: 100vh; background: var(--bg); }
 
+/* ── Sidebar (desktop) ────── */
 .sidebar {
-  width: 220px; min-width: 220px;
-  background: var(--bg2); border-right: 1px solid var(--border);
-  display: flex; flex-direction: column;
-  padding: 24px 0 0;
+  display: none;
+  width: 240px; min-width: 240px; flex-shrink: 0;
+  background: var(--bg2); border-right: 1px solid var(--separator);
+  flex-direction: column; padding: 20px 0 0;
   position: sticky; top: 0; height: 100vh;
 }
+@media (min-width: 768px) { .sidebar { display: flex; } }
 
 .sidebar-logo {
-  padding: 0 20px 24px;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 16px;
-  font-family: var(--font-display); font-size: 1.5rem;
-  letter-spacing: 0.1em; line-height: 1;
-}
-.logo-text { color: var(--text); }
-.logo-accent { color: var(--accent); margin-left: 4px; }
-
-.sidebar-nav { display: flex; flex-direction: column; gap: 2px; padding: 0 8px; flex: 1; }
-
-.nav-item {
   display: flex; align-items: center; gap: 10px;
-  padding: 10px 12px; border-radius: var(--radius);
-  color: var(--text2); text-decoration: none;
-  font-size: 14px; font-weight: 500; transition: all 0.15s;
+  padding: 0 20px 20px; border-bottom: 1px solid var(--separator); margin-bottom: 12px;
 }
-.nav-item:hover { background: var(--bg3); color: var(--text); }
-.nav-item.active { background: var(--accent-dim); color: var(--accent); }
-.nav-icon { font-size: 16px; }
+.logo-mark { font-size: 1.4rem; }
+.logo-name  { font-size: 1.1rem; font-weight: 700; letter-spacing: -0.02em; color: var(--text); }
+
+.sidebar-nav { display: flex; flex-direction: column; gap: 2px; padding: 0 10px; flex: 1; }
+.sidebar-item {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+  border-radius: var(--radius-sm); color: var(--text2); text-decoration: none;
+  font-size: 0.9375rem; font-weight: 500; transition: all 0.15s;
+}
+.sidebar-item:hover { background: var(--bg3); color: var(--text); }
+.sidebar-item.active { background: var(--accent-bg); color: var(--accent); font-weight: 600; }
+.sidebar-icon { font-size: 1.1rem; width: 22px; text-align: center; }
 
 .sidebar-footer {
-  display: flex; align-items: center; gap: 8px;
-  padding: 12px 12px 16px;
-  border-top: 1px solid var(--border); margin-top: auto;
+  padding: 12px 14px calc(14px + var(--safe-bottom));
+  border-top: 1px solid var(--separator);
 }
-.user-chip { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
-.user-avatar {
-  width: 30px; height: 30px; border-radius: 50%;
-  background: var(--accent-dim); color: var(--accent);
+.sidebar-user { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.avatar {
+  width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
+  background: var(--accent-bg); color: var(--accent);
   display: flex; align-items: center; justify-content: center;
-  font-family: var(--font-display); font-size: 1rem;
-  flex-shrink: 0;
+  font-size: 0.875rem; font-weight: 700;
 }
-.user-info { min-width: 0; }
-.user-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-.main-content { flex: 1; overflow-y: auto; background: var(--bg); }
-
-@media (max-width: 640px) {
-  .app-layout { flex-direction: column; }
-  .sidebar { width: 100%; height: auto; position: static; flex-direction: row; padding: 0; }
-  .sidebar-logo { display: none; }
-  .sidebar-nav { flex-direction: row; padding: 0; width: 100%; flex: unset; }
-  .sidebar-footer { display: none; }
-  .nav-item { flex: 1; justify-content: center; padding: 12px 4px; flex-direction: column; gap: 2px; font-size: 10px; }
-  .nav-icon { font-size: 20px; }
+.user-text { flex: 1; min-width: 0; }
+.user-name  { font-size: 0.875rem; font-weight: 600; }
+.user-handle { font-size: 0.75rem; color: var(--text3); }
+.sidebar-actions { display: flex; gap: 6px; }
+.icon-btn {
+  background: var(--bg3); border: none; border-radius: var(--radius-sm);
+  padding: 7px 9px; cursor: pointer; font-size: 1rem;
+  transition: background 0.15s; -webkit-tap-highlight-color: transparent;
 }
+.icon-btn:active { background: var(--bg4); }
+
+/* ── Main ────── */
+.main-content { flex: 1; min-width: 0; }
+@media (min-width: 768px) { .main-content { height: 100vh; overflow-y: auto; } }
 </style>

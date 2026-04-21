@@ -1,12 +1,24 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { api } from '../composables/api'
 
 export const useAuthStore = defineStore('auth', () => {
   const token = ref(localStorage.getItem('gym_token') || null)
   const user = ref(JSON.parse(localStorage.getItem('gym_user') || 'null'))
+  const theme = ref(localStorage.getItem('gym_theme') || 'light')
 
   const isLoggedIn = computed(() => !!token.value)
+
+  function applyTheme(t) {
+    document.documentElement.setAttribute('data-theme', t)
+  }
+  applyTheme(theme.value)
+
+  function toggleTheme() {
+    theme.value = theme.value === 'dark' ? 'light' : 'dark'
+    localStorage.setItem('gym_theme', theme.value)
+    applyTheme(theme.value)
+  }
 
   async function login(username, password) {
     const res = await api.login({ username, password })
@@ -31,5 +43,5 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('gym_user')
   }
 
-  return { token, user, isLoggedIn, login, register, logout }
+  return { token, user, theme, isLoggedIn, login, register, logout, toggleTheme }
 })

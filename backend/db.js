@@ -16,16 +16,19 @@ function columnExists(table, column) {
   return db.prepare(`PRAGMA table_info(${table})`).all().some(c => c.name === column);
 }
 function tableExists(table) {
-  return !!db.prepare('SELECT name FROM sqlite_master WHERE type=\'table\' AND name=?').get(table);
+  return !!db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(table);
 }
 
-// v2→v3: add user_id to routines if missing
+// Disable FK checks during migrations to avoid constraint violations
+db.pragma('foreign_keys = OFF');
+
+// v2→v3: add user_id to routines if missing (DEFAULT 1 = admin user placeholder)
 if (tableExists('routines') && !columnExists('routines', 'user_id')) {
-  db.exec('ALTER TABLE routines ADD COLUMN user_id INTEGER NOT NULL DEFAULT 1');
+  db.exec('ALTER TABLE routines ADD COLUMN user_id INTEGER DEFAULT 1');
 }
 // v2→v3: add user_id to workout_sessions if missing
 if (tableExists('workout_sessions') && !columnExists('workout_sessions', 'user_id')) {
-  db.exec('ALTER TABLE workout_sessions ADD COLUMN user_id INTEGER NOT NULL DEFAULT 1');
+  db.exec('ALTER TABLE workout_sessions ADD COLUMN user_id INTEGER DEFAULT 1');
 }
 // v2→v3: create exercise_set_templates if missing, seed from old sets/reps columns
 if (!tableExists('exercise_set_templates')) {
@@ -39,9 +42,7 @@ if (!tableExists('exercise_set_templates')) {
       FOREIGN KEY (exercise_id) REFERENCES exercises(id) ON DELETE CASCADE
     )
   `);
-  const hasSets = tableExists('exercises') && columnExists('exercises', 'sets');
-  const hasReps = tableExists('exercises') && columnExists('exercises', 'reps');
-  if (hasSets && hasReps) {
+  if (tableExists('exercises') && columnExists('exercises', 'sets') && columnExists('exercises', 'reps')) {
     const exercises = db.prepare('SELECT id, sets, reps FROM exercises').all();
     const ins = db.prepare('INSERT INTO exercise_set_templates (exercise_id, set_number, target_weight_kg, target_reps) VALUES (?, ?, NULL, ?)');
     const parseReps = (r) => { if (!r) return null; const m = String(r).match(/\d+/); return m ? parseInt(m[0]) : null; };
@@ -51,6 +52,9 @@ if (!tableExists('exercise_set_templates')) {
     }
   }
 }
+
+// Re-enable FK checks after migrations
+db.pragma('foreign_keys = ON');
 
 
 db.exec(`

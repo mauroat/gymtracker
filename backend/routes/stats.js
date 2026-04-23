@@ -71,7 +71,64 @@ router.get('/prs', (req, res) => {
   res.json(rows);
 });
 
-// GET summary stats
+// GET export all data as JSON
+router.get('/export', (req, res) => {
+  const routines = db.prepare(`
+    SELECT * FROM routines WHERE user_id = ? ORDER BY position
+  `).all(req.userId)
+
+  for (const r of routines) {
+    const exercises = db.prepare('SELECT * FROM exercises WHERE routine_id = ? ORDER BY position').all(r.id)
+    for (const ex of exercises) {
+      ex.set_templates = db.prepare('SELECT * FROM exercise_set_templates WHERE exercise_id = ? ORDER BY set_number').all(ex.id)
+    }
+    r.exercises = exercises
+  }
+
+  const sessions = db.prepare(`
+    SELECT s.*, r.name as routine_name
+    FROM workout_sessions s
+    JOIN routines r ON r.id = s.routine_id
+    WHERE s.user_id = ?
+    ORDER BY s.started_at DESC
+  `).all(req.userId)
+
+  for (const s of sessions) {
+    s.sets = db.prepare(`
+      SELECT ss.*, e.name as exercise_name
+      FROM session_sets ss
+      JOIN exercises e ON e.id = ss.exercise_id
+      WHERE ss.session_id = ?
+      ORDER BY ss.exercise_id, ss.set_number
+    `).all(s.id)
+  }
+
+  const prs = db.prepare(`
+    SELECT e.name as exercise_name, r.name as routine_name,
+      MAX(ss.weight_kg) as pr_weight, MAX(ws.started_at) as achieved_at
+    FROM session_sets ss
+    JOIN exercises e ON e.id = ss.exercise_id
+    JOIN routines r ON r.id = e.routine_id
+    JOIN workout_sessions ws ON ws.id = ss.session_id
+    WHERE ss.weight_kg IS NOT NULL AND ws.user_id = ?
+    GROUP BY e.id ORDER BY r.position, e.position
+  `).all(req.userId)
+
+  res.json({
+    exported_at: new Date().toISOString(),
+    user: db.prepare('SELECT id, username, display_name, created_at FROM users WHERE id = ?').get(req.userId),
+    summary: {
+      total_routines: routines.length,
+      total_sessions: sessions.length,
+      total_sets: sessions.reduce((a, s) => a + s.sets.length, 0),
+    },
+    routines,
+    sessions,
+    personal_records: prs,
+  })
+})
+
+
 router.get('/summary', (req, res) => {
   const last30 = db.prepare(`SELECT COUNT(*) as c FROM workout_sessions WHERE user_id = ? AND started_at >= datetime('now', '-30 days')`).get(req.userId).c;
   const last90 = db.prepare(`SELECT COUNT(*) as c FROM workout_sessions WHERE user_id = ? AND started_at >= datetime('now', '-90 days')`).get(req.userId).c;

@@ -18,8 +18,7 @@ router.post('/register', (req, res) => {
     'INSERT INTO users (username, password_hash, display_name) VALUES (?, ?, ?)'
   ).run(username.toLowerCase().trim(), hash, display_name || username);
 
-  // Seed default routines for new user
-  seedRoutinesForUser(userId);
+  // No seeding — user builds their own routines
 
   const user = db.prepare('SELECT id, username, display_name, created_at FROM users WHERE id = ?').get(userId);
   const token = signToken(userId);

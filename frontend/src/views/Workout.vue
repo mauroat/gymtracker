@@ -1,6 +1,6 @@
 <template>
   <div class="page fade-in" v-if="routine">
-    <!-- Header sticky -->
+    <!-- Header -->
     <div class="workout-top">
       <div class="workout-title-row">
         <div>
@@ -79,10 +79,12 @@
       </div>
     </div>
   </div>
+
+  <!-- Sesión activa banner (shown on other pages via App.vue) -->
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '../composables/api'
 
@@ -90,6 +92,8 @@ const route = useRoute(); const router = useRouter()
 const routine = ref(null); const sessionId = ref(null); const allSets = ref([])
 const openId = ref(null); const inputs = reactive({}); const timers = reactive({}); const tIntervals = {}
 const prMap = ref({}); const startTime = ref(Date.now()); const elapsedTime = ref('0:00'); let clock
+
+const STORAGE_KEY = 'gym_active_session'
 
 const formatRest = s => s >= 60 ? `${Math.floor(s/60)}min` : `${s}s`
 const fmt = s => `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`
@@ -101,6 +105,20 @@ const totalPlanned = computed(() => (routine.value?.exercises||[]).reduce((a,ex)
 const totalLogged = computed(() => allSets.value.length)
 const pct = computed(() => totalPlanned.value ? Math.round(totalLogged.value/totalPlanned.value*100) : 0)
 const toggle = id => { openId.value = openId.value === id ? null : id }
+
+// Persist active session so tab switches don't lose it
+function saveActiveSession() {
+  if (sessionId.value) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      sessionId: sessionId.value,
+      routineId: route.params.routineId,
+      startTime: startTime.value,
+    }))
+  }
+}
+function clearActiveSession() {
+  localStorage.removeItem(STORAGE_KEY)
+}
 
 const logSet = async (ex, i) => {
   const inp = inputs[ex.id][i]; const tpl = ex.set_templates[i]
@@ -116,33 +134,100 @@ const logSet = async (ex, i) => {
     tIntervals[ex.id] = setInterval(() => { if(timers[ex.id]<=1){timers[ex.id]=0;clearInterval(tIntervals[ex.id])}else timers[ex.id]-- }, 1000)
   }
   const next = i+1
-  if (next < ex.set_templates.length) { inputs[ex.id][next].weight_kg = inp.weight_kg ?? tpl.target_weight_kg ?? null; inputs[ex.id][next].reps_done = null; inputs[ex.id][next].rpe = null }
+  if (next < ex.set_templates.length) {
+    inputs[ex.id][next].weight_kg = inp.weight_kg ?? tpl.target_weight_kg ?? null
+    inputs[ex.id][next].reps_done = null; inputs[ex.id][next].rpe = null
+  }
 }
 const unlog = async (exId, n) => { const s=getLogged(exId,n); if(!s) return; await api.deleteSet(sessionId.value,s.id); allSets.value=allSets.value.filter(x=>x.id!==s.id) }
 const clearTimer = id => { timers[id]=0; clearInterval(tIntervals[id]) }
-const finishWorkout = async () => { await api.finishSession(sessionId.value); router.push('/') }
+
+const finishWorkout = async () => {
+  await api.finishSession(sessionId.value)
+  clearActiveSession()
+  router.push('/')
+}
 
 onMounted(async () => {
-  routine.value = await api.getRoutine(route.params.routineId)
-  if (route.query.session) {
-    sessionId.value = parseInt(route.query.session)
-    const sess = await api.getSession(sessionId.value)
-    allSets.value = (sess.sets||[]).map(s=>({...s}))
-  } else {
-    const sess = await api.startSession(route.params.routineId)
-    sessionId.value = sess.id
-    router.replace(`/workout/${route.params.routineId}?session=${sess.id}`)
+  const routineId = route.params.routineId
+
+  // Determine session: from URL param, localStorage, or create new
+  let sid = route.query.session ? parseInt(route.query.session) : null
+
+  if (!sid) {
+    const saved = localStorage.getItem(STORAGE_KEY)
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved)
+        // Only restore if same routine
+        if (String(parsed.routineId) === String(routineId)) {
+          sid = parsed.sessionId
+          startTime.value = parsed.startTime || Date.now()
+        }
+      } catch {}
+    }
   }
+
+  routine.value = await api.getRoutine(routineId)
+
+  if (sid) {
+    // Verify session still exists and isn't finished
+    try {
+      const sess = await api.getSession(sid)
+      if (sess && !sess.finished_at) {
+        sessionId.value = sid
+        allSets.value = (sess.sets||[]).map(s=>({...s}))
+      } else {
+        // Session finished or not found — start fresh
+        sid = null
+      }
+    } catch {
+      sid = null
+    }
+  }
+
+  if (!sid) {
+    const sess = await api.startSession(routineId)
+    sessionId.value = sess.id
+    startTime.value = Date.now()
+  }
+
+  // Always sync URL and localStorage
+  router.replace(`/workout/${routineId}?session=${sessionId.value}`)
+  saveActiveSession()
+
+  // Init inputs
   for (const ex of routine.value.exercises) {
-    inputs[ex.id] = ex.set_templates.map(t => ({ weight_kg: t.target_weight_kg??null, reps_done: t.target_reps??null, rpe: null }))
+    inputs[ex.id] = ex.set_templates.map(t => ({
+      weight_kg: t.target_weight_kg ?? null,
+      reps_done: t.target_reps ?? null,
+      rpe: null,
+    }))
     timers[ex.id] = 0
   }
+
+  // Prefill weight from last logged set (already in allSets)
+  for (const ex of routine.value.exercises) {
+    const exSets = allSets.value.filter(s => s.exercise_id === ex.id)
+    const nextIdx = exSets.length
+    if (nextIdx < ex.set_templates.length && nextIdx > 0) {
+      const lastSet = exSets[nextIdx - 1]
+      inputs[ex.id][nextIdx].weight_kg = lastSet.weight_kg
+    }
+  }
+
+  // Open first incomplete
   const first = routine.value.exercises.find(ex => !isDone(ex)) || routine.value.exercises[0]
   if (first) openId.value = first.id
-  const prs = await api.getPRs()
-  prMap.value = Object.fromEntries(prs.map(p => [p.exercise_id, p.pr_weight]))
-  clock = setInterval(() => { const s=Math.floor((Date.now()-startTime.value)/1000); elapsedTime.value=`${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}` }, 1000)
+
+  prMap.value = Object.fromEntries((await api.getPRs()).map(p => [p.exercise_id, p.pr_weight]))
+
+  clock = setInterval(() => {
+    const s=Math.floor((Date.now()-startTime.value)/1000)
+    elapsedTime.value=`${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`
+  }, 1000)
 })
+
 onUnmounted(() => { clearInterval(clock); Object.values(tIntervals).forEach(clearInterval) })
 </script>
 

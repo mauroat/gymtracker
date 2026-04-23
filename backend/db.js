@@ -11,6 +11,48 @@ const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 
+// ── Migrations: handle schema upgrades on existing DBs ──────────
+function columnExists(table, column) {
+  return db.prepare(`PRAGMA table_info(${table})`).all().some(c => c.name === column);
+}
+function tableExists(table) {
+  return !!db.prepare('SELECT name FROM sqlite_master WHERE type=\'table\' AND name=?').get(table);
+}
+
+// v2→v3: add user_id to routines if missing
+if (tableExists('routines') && !columnExists('routines', 'user_id')) {
+  db.exec('ALTER TABLE routines ADD COLUMN user_id INTEGER NOT NULL DEFAULT 1');
+}
+// v2→v3: add user_id to workout_sessions if missing
+if (tableExists('workout_sessions') && !columnExists('workout_sessions', 'user_id')) {
+  db.exec('ALTER TABLE workout_sessions ADD COLUMN user_id INTEGER NOT NULL DEFAULT 1');
+}
+// v2→v3: create exercise_set_templates if missing, seed from old sets/reps columns
+if (!tableExists('exercise_set_templates')) {
+  db.exec(`
+    CREATE TABLE exercise_set_templates (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      exercise_id INTEGER NOT NULL,
+      set_number INTEGER NOT NULL,
+      target_weight_kg REAL,
+      target_reps INTEGER,
+      FOREIGN KEY (exercise_id) REFERENCES exercises(id) ON DELETE CASCADE
+    )
+  `);
+  const hasSets = tableExists('exercises') && columnExists('exercises', 'sets');
+  const hasReps = tableExists('exercises') && columnExists('exercises', 'reps');
+  if (hasSets && hasReps) {
+    const exercises = db.prepare('SELECT id, sets, reps FROM exercises').all();
+    const ins = db.prepare('INSERT INTO exercise_set_templates (exercise_id, set_number, target_weight_kg, target_reps) VALUES (?, ?, NULL, ?)');
+    const parseReps = (r) => { if (!r) return null; const m = String(r).match(/\d+/); return m ? parseInt(m[0]) : null; };
+    for (const ex of exercises) {
+      const n = parseInt(ex.sets) || 3;
+      for (let i = 1; i <= n; i++) ins.run(ex.id, i, parseReps(ex.reps));
+    }
+  }
+}
+
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

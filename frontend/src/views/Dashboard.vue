@@ -33,7 +33,17 @@
 
     <!-- Quick start -->
     <div class="section-header">Comenzar</div>
-    <div class="list-card">
+    <div v-if="routines.length === 0" class="list-card">
+      <div class="list-row" style="cursor:default">
+        <div class="list-row-icon" style="background:var(--bg3)">📋</div>
+        <div class="list-row-body">
+          <div class="list-row-title">No tenés rutinas aún</div>
+          <div class="list-row-sub">Creá tu primera rutina desde la pestaña Rutinas</div>
+        </div>
+        <RouterLink to="/routines" class="btn btn-primary btn-xs">Crear</RouterLink>
+      </div>
+    </div>
+    <div v-else class="list-card">
       <div v-for="r in routines" :key="r.id" class="list-row" @click="startWorkout(r.id)">
         <div class="list-row-icon" style="background: var(--accent-bg)">💪</div>
         <div class="list-row-body">

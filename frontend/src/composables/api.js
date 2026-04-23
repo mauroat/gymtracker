@@ -65,4 +65,5 @@ export const api = {
   getWeeklyVolume: () => req('GET', '/stats/weekly-volume'),
   getPRs: () => req('GET', '/stats/prs'),
   getSummary: () => req('GET', '/stats/summary'),
+  exportData: () => req('GET', '/stats/export'),
 }

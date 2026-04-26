@@ -107,6 +107,7 @@ ${!hasKey ? `<div style="padding:20px"><div class="disabled-overlay">
 <div class="tabs">
   <div class="tab active" onclick="switchTab('copy')">📋 Copiar rutinas</div>
   <div class="tab" onclick="switchTab('users')">👤 Usuarios</div>
+  <div class="tab" onclick="switchTab('import')">⬆ Importar</div>
   <div class="tab" onclick="switchTab('sql')">🔧 SQL</div>
 </div>
 
@@ -171,6 +172,26 @@ ${!hasKey ? `<div style="padding:20px"><div class="disabled-overlay">
   </div>
 </div>
 
+
+<!-- ── TAB: Import ── -->
+<div id="tab-import" class="panel">
+  <div id="importAlert"></div>
+  <div class="card">
+    <div class="card-header">⬆ Restaurar datos desde JSON export</div>
+    <div class="card-body">
+      <p style="font-size:13px;color:var(--text3,#8e8e93);margin-bottom:14px">
+        Subí un archivo JSON exportado desde Stats → Exportar. Las rutinas y sesiones se importan sin pisar datos existentes.
+      </p>
+      <div style="margin-bottom:12px">
+        <label>Archivo JSON</label>
+        <input type="file" id="importFile" accept=".json" style="padding:8px;font-size:13px;border-radius:8px;border:1px solid #e5e5ea;width:100%" />
+      </div>
+      <div id="importPreview" style="display:none;margin-bottom:12px"></div>
+      <button class="btn btn-success" onclick="doImport()" id="importBtn" disabled>⬆ Importar datos</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── TAB: SQL ── -->
 <div id="tab-sql" class="panel">
   <div class="card">
@@ -213,7 +234,7 @@ async function apiFetch(path, opts = {}) {
 
 function switchTab(name) {
   document.querySelectorAll('.tab').forEach((t,i) => {
-    const names = ['copy','users','sql'];
+    const names = ['copy','users','import','sql'];
     t.classList.toggle('active', names[i] === name);
   });
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
@@ -388,6 +409,49 @@ function renderTable(rows) {
       ).join('') + '</tr>').join('') + '</tbody></table></div>';
 }
 
+
+// ── Import tab JS ──
+document.getElementById('importFile').addEventListener('change', async function(e) {
+  var file = e.target.files[0];
+  if (!file) return;
+  try {
+    var text = await file.text();
+    var data = JSON.parse(text);
+    var preview = document.getElementById('importPreview');
+    preview.style.display = 'block';
+    preview.innerHTML = '<div class="alert alert-info"><strong>Listo para importar:</strong><br>'
+      + '👤 Usuario: <strong>' + (data.user && data.user.username || '?') + '</strong> &nbsp;|&nbsp; '
+      + '📋 Rutinas: <strong>' + (data.routines && data.routines.length || 0) + '</strong> &nbsp;|&nbsp; '
+      + '📅 Sesiones: <strong>' + (data.sessions && data.sessions.length || 0) + '</strong></div>';
+    var btn = document.getElementById('importBtn');
+    btn.disabled = false;
+    btn.dataset.json = text;
+  } catch(err) {
+    document.getElementById('importPreview').style.display = 'block';
+    document.getElementById('importPreview').innerHTML = '<div class="alert alert-err">Archivo JSON inválido</div>';
+    document.getElementById('importBtn').disabled = true;
+  }
+});
+
+async function doImport() {
+  var btn = document.getElementById('importBtn');
+  var json = btn.dataset.json;
+  if (!json) return;
+  btn.disabled = true; btn.textContent = 'Importando...';
+  var alertEl = document.getElementById('importAlert');
+  try {
+    var data = await apiFetch('/api/admin/import', { method: 'POST', body: json });
+    var s = data.stats;
+    alertEl.innerHTML = '<div class="alert alert-ok">✓ ' + data.message
+      + ' — ' + s.routinesCreated + ' rutinas, ' + s.exercisesCreated + ' ejercicios, '
+      + s.sessionsCreated + ' sesiones, ' + s.setsCreated + ' series importadas</div>';
+  } catch(e) {
+    alertEl.innerHTML = '<div class="alert alert-err">✗ ' + e.message + '</div>';
+  } finally {
+    btn.disabled = false; btn.textContent = '⬆ Importar datos';
+  }
+}
+
 document.getElementById('sqlInput').addEventListener('keydown', e => {
   if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); runQuery(); }
 });
@@ -478,3 +542,84 @@ router.post('/copy-routine', adminAuth, (req, res, next) => {
 });
 
 module.exports = router;
+
+// POST /api/admin/import  — restore a full JSON export
+router.post('/import', adminAuth, (req, res, next) => {
+  try {
+    const data = req.body;
+    if (!data?.routines || !data?.sessions) {
+      return res.status(400).json({ error: 'JSON inválido. Debe ser un export completo de GymTracker.' });
+    }
+
+    let usersCreated = 0, routinesCreated = 0, exercisesCreated = 0, sessionsCreated = 0, setsCreated = 0;
+
+    // Import users (skip if username already exists)
+    if (data.user) {
+      const existing = db.prepare('SELECT id FROM users WHERE username = ?').get(data.user.username);
+      if (!existing) {
+        db.prepare('INSERT OR IGNORE INTO users (id, username, password_hash, display_name, created_at) VALUES (?, ?, ?, ?, ?)')
+          .run(data.user.id, data.user.username, '$2a$10$placeholder', data.user.display_name, data.user.created_at);
+        usersCreated++;
+      }
+    }
+
+    // Map old IDs → new IDs in case of conflicts
+    const routineIdMap = {};
+    const exerciseIdMap = {};
+    const sessionIdMap = {};
+
+    for (const r of (data.routines || [])) {
+      // Check if this routine already exists (same user_id + name)
+      const existing = db.prepare('SELECT id FROM routines WHERE user_id = ? AND name = ?').get(r.user_id, r.name);
+      if (existing) { routineIdMap[r.id] = existing.id; continue; }
+
+      const maxPos = db.prepare('SELECT MAX(position) as m FROM routines WHERE user_id = ?').get(r.user_id).m ?? -1;
+      const { lastInsertRowid: newRId } = db.prepare(
+        'INSERT INTO routines (user_id, name, description, day_label, position, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+      ).run(r.user_id, r.name, r.description || '', r.day_label || '', maxPos + 1, r.created_at, r.updated_at);
+      routineIdMap[r.id] = newRId;
+      routinesCreated++;
+
+      for (const ex of (r.exercises || [])) {
+        const posRow = db.prepare('SELECT MAX(position) as m FROM exercises WHERE routine_id = ?').get(newRId);
+        const exPos = (posRow && posRow.m != null) ? posRow.m + 1 : 0;
+        const { lastInsertRowid: newExId } = db.prepare(
+          'INSERT INTO exercises (routine_id, name, rest_seconds, notes, position) VALUES (?, ?, ?, ?, ?)'
+        ).run(newRId, ex.name, ex.rest_seconds || 90, ex.notes || '', exPos);
+        exerciseIdMap[ex.id] = newExId;
+        exercisesCreated++;
+
+        for (const tpl of (ex.set_templates || [])) {
+          db.prepare('INSERT INTO exercise_set_templates (exercise_id, set_number, target_weight_kg, target_reps) VALUES (?, ?, ?, ?)')
+            .run(newExId, tpl.set_number, tpl.target_weight_kg ?? null, tpl.target_reps ?? null);
+        }
+      }
+    }
+
+    for (const s of (data.sessions || [])) {
+      const mappedRoutineId = routineIdMap[s.routine_id];
+      if (!mappedRoutineId) continue; // skip orphan sessions
+
+      const { lastInsertRowid: newSId } = db.prepare(
+        'INSERT INTO workout_sessions (user_id, routine_id, notes, started_at, finished_at) VALUES (?, ?, ?, ?, ?)'
+      ).run(s.user_id, mappedRoutineId, s.notes || '', s.started_at, s.finished_at || null);
+      sessionIdMap[s.id] = newSId;
+      sessionsCreated++;
+
+      for (const set of (s.sets || [])) {
+        const mappedExId = exerciseIdMap[set.exercise_id];
+        if (!mappedExId) continue;
+        db.prepare(
+          'INSERT INTO session_sets (session_id, exercise_id, set_number, weight_kg, reps_done, rpe, notes, logged_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+        ).run(newSId, mappedExId, set.set_number, set.weight_kg ?? null, set.reps_done ?? null, set.rpe ?? null, set.notes || '', set.logged_at);
+        setsCreated++;
+      }
+    }
+
+    res.json({
+      ok: true,
+      message: 'Importación completada',
+      stats: { usersCreated, routinesCreated, exercisesCreated, sessionsCreated, setsCreated }
+    });
+  } catch (e) { next(e); }
+});
